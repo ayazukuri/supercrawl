@@ -1,10 +1,7 @@
 from __future__ import annotations
 from typing import Callable, Awaitable
 from asyncio import gather
-import pyppeteer
-from pyppeteer.browser import Browser
-from pyppeteer.page import Page
-from pyppeteer.element_handle import ElementHandle
+from playwright.async_api import async_playwright, Browser, ElementHandle, Page
 
 class LogicHandle:
     element_handle: ElementHandle
@@ -12,8 +9,9 @@ class LogicHandle:
     def __init__(self, element_handle):
         self.element_handle = element_handle
     
-    def log(self):
-        pass
+    async def log(self):
+        el = self.element_handle
+        print(await el.bounding_box())
 
 class Routine:
     query: str
@@ -25,9 +23,8 @@ class Routine:
     
     async def run(self, page: Page) -> None:
         # TODO: find way to prevent fetching same element multiple times.
-        await page.waitForSelector(self.query)
-        element_handles = await page.querySelectorAll(self.query)
-        await gather(*map(lambda h: self.cb(LogicHandle(h)), element_handles))
+        handle = await page.wait_for_selector(self.query)
+        await self.cb(LogicHandle(handle))
 
 class PageContext:
     sc: SuperCrawl
@@ -52,8 +49,8 @@ class PageContext:
             await routine.run(self.page)
 
     async def _init_loop(self) -> None:
-        self.page = await self.browser.newPage()
-        await self.page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0")
+        context = await self.browser.new_context()
+        self.page = await context.new_page()
         await self.page.goto(self.url)
         self.running = True
         await gather(*map(lambda r: self._apply_routine(r), self._routines))
@@ -65,8 +62,9 @@ class SuperCrawl:
 
     @classmethod
     async def instance(cls):
+        apw = await async_playwright().start()
         self = SuperCrawl()
-        self.browser = await pyppeteer.launch()
+        self.browser = await apw.chromium.launch(headless=False)
         self._ctx = []
         return self
     
