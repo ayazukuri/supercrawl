@@ -3,10 +3,17 @@ from typing import Callable, Awaitable
 from asyncio import gather
 from playwright.async_api import async_playwright, Browser, ElementHandle, Page
 
+def on_page(func: Callable[[PageContext], Awaitable]):
+    def fn(lh: LogicHandle) -> Awaitable:
+        return func(lh.ctx)
+    return fn
+
 class LogicHandle:
+    ctx: PageContext
     element_handle: ElementHandle
 
-    def __init__(self, element_handle):
+    def __init__(self, ctx: PageContext, element_handle: ElementHandle):
+        self.ctx = ctx
         self.element_handle = element_handle
     
     async def log(self):
@@ -14,17 +21,20 @@ class LogicHandle:
         print(await el.bounding_box())
 
 class Routine:
+    ctx: PageContext
     query: str
-    cb: Callable[[LogicHandle], Awaitable]
+    cbs: tuple[Callable[[LogicHandle], Awaitable]]
 
-    def __init__(self, query: str, cb: Callable[[LogicHandle], Awaitable]):
+    def __init__(self, ctx: PageContext, query: str, cbs: tuple[Callable[[LogicHandle]], Awaitable]):
+        self.ctx = ctx
         self.query = query
-        self.cb = cb
+        self.cbs = cbs
     
     async def run(self, page: Page) -> None:
-        # TODO: find way to prevent fetching same element multiple times.
         handle = await page.wait_for_selector(self.query)
-        await self.cb(LogicHandle(handle))
+        lh = LogicHandle(self.ctx, handle)
+        for cb in self.cbs:
+            await cb(lh)
 
 class PageContext:
     sc: SuperCrawl
@@ -41,8 +51,8 @@ class PageContext:
         self.running = False
         self._routines = []
     
-    def every(self, query: str, cb: Callable[[LogicHandle], Awaitable]) -> None:
-        self._routines.append(Routine(query, cb))
+    def every(self, query: str, *cbs: Callable[[LogicHandle], Awaitable]) -> None:
+        self._routines.append(Routine(self, query, cbs))
     
     async def _apply_routine(self, routine: Routine) -> None:
         while self.running:
