@@ -38,7 +38,6 @@ class Routine:
 
 class PageContext:
     sc: SuperCrawl
-    browser: Browser
     page: Page
     url: str
     running: bool
@@ -46,7 +45,6 @@ class PageContext:
 
     def __init__(self, sc: SuperCrawl, url: str):
         self.sc = sc
-        self.browser = sc.browser
         self.url = url
         self.running = False
         self._routines = []
@@ -59,7 +57,7 @@ class PageContext:
             await routine.run(self.page)
 
     async def _init_loop(self) -> None:
-        context = await self.browser.new_context()
+        context = await self.sc.browser.new_context()
         self.page = await context.new_page()
         await self.page.goto(self.url)
         self.running = True
@@ -67,21 +65,17 @@ class PageContext:
 
 class SuperCrawl:
     browser: Browser
-    pages: list[Page]
     _ctx: list[PageContext]
 
-    @classmethod
-    async def instance(cls):
-        apw = await async_playwright().start()
-        self = SuperCrawl()
-        self.browser = await apw.chromium.launch(headless=False)
+    def __init__(self):
         self._ctx = []
-        return self
     
     def ctx(self, url: str):
         ctx = PageContext(self, url)
         self._ctx.append(ctx)
         return ctx
     
-    def run(self) -> Awaitable:
-        return gather(*map(lambda ctx: ctx._init_loop(), self._ctx))
+    async def run(self) -> None:
+        apw = await async_playwright().start()
+        self.browser = await apw.chromium.launch(headless=False)
+        await gather(*map(lambda ctx: ctx._init_loop(), self._ctx))
