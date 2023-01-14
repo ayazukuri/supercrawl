@@ -4,10 +4,10 @@ from pymongo.mongo_client import MongoClient
 class MongoDriver:
     client: MongoClient
 
-    @overload
-    def __init__(self, connstr: str):
-        self.client = MongoClient(str)
-    
-    @overload
-    def __init__(self, cl: MongoClient):
-        self.client = cl
+    def __init__(self, arg: str | MongoClient):
+        if isinstance(arg, str):
+            self.client = MongoClient(arg)
+        elif isinstance(arg, MongoClient):
+            self.client = arg
+        else:
+            raise TypeError("arg must be of type str or MongoClient")

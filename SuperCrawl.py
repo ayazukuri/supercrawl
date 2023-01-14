@@ -101,5 +101,5 @@ class SuperCrawl:
     
     async def run(self) -> None:
         apw = await async_playwright().start()
-        self.browser = await apw.chromium.launch(headless=True)
+        self.browser = await apw.chromium.launch(headless=False)
         await gather(*map(lambda ctx: ctx._init_loop(), self._ctx))
