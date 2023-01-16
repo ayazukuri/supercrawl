@@ -62,10 +62,7 @@ class SuperCrawl:
         return SuperCrawl(arg[0] if len(arg) > 0 else None, browser=self.browser)
     
     def every(self, query: str, *cbs: Callable[[LogicHandle], Awaitable], final=None) -> None:
-        self._routines.append(Routine(self, query, cbs, final=final))
-    
-    def every_unique(self, query: str, *cbs: Callable[[LogicHandle], Awaitable], final=None) -> None:
-        self.every(f"{query}:not(.supercrawl-handled)", *cbs, mark_done, final=final)
+        self._routines.append(Routine(self, f"{query}:not(.supercrawl-handled)", cbs + (mark_done,), final=final))
 
     async def _init(self) -> None:
         if not self.browser:

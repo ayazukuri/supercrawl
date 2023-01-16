@@ -16,10 +16,10 @@ async def comm_h(lh: LogicHandle):
     url = await c.get_attribute("href")
     if not url or url == "javascript:void(0);": return
     sub = lh.sc.sub(f"https://9gag.com{url}")
-    sub.every_unique("section.comment-list", printl)
+    sub.every("section.comment-list", printl)
     await sub.run()
 
 sc = SuperCrawl("https://9gag.com")
-sc.every_unique("article", comm_h)
+sc.every("article", comm_h)
 
 run(sc.loop())
