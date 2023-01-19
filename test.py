@@ -1,5 +1,9 @@
 from SuperCrawl import SuperCrawl, LogicHandle
-from asyncio import run
+from asyncio import run, sleep, set_event_loop_policy, WindowsSelectorEventLoopPolicy
+
+async def page_waiter(page):
+    await sleep(10)
+    print("closing")
 
 async def print_lh(lh: LogicHandle):
     h2 = await lh.element_handle.query_selector("h2")
@@ -20,6 +24,6 @@ async def comm_h(lh: LogicHandle):
     await sub.run()
 
 sc = SuperCrawl("https://9gag.com")
-sc.every("article", comm_h)
+sc.every("article", print_lh)
 
-run(sc.loop())
+run(sc.run(page_waiter))
