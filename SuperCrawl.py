@@ -33,7 +33,8 @@ class Routine:
             await cb(lh)
 
     async def run(self, page: Page) -> None:
-        await page.wait_for_selector(self.query)
+        done, _ = await wait([self.sc._running, page.wait_for_selector(self.query)], return_when=FIRST_COMPLETED)
+        if 0 in map(lambda task: task.result(), done): return
         handles = await page.query_selector_all(self.query)
         await gather(*map(lambda h: self._run_one(LogicHandle(self.sc, h)), handles))
 
