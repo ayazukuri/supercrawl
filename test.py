@@ -1,5 +1,5 @@
 from SuperCrawl import SuperCrawl, LogicHandle
-from asyncio import run, sleep, set_event_loop_policy, WindowsSelectorEventLoopPolicy
+from asyncio import run, sleep
 
 async def page_waiter(page):
     await sleep(10)
