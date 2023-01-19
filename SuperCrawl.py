@@ -82,7 +82,7 @@ class SuperCrawl:
         await self.page.goto(self.url)
 
     async def _apply_routine_loop(self, routine: Routine) -> None:
-        while True:
+        while not self._running.done():
             await routine.run(self.page)
 
     async def run(self, *actions: Callable[[Page], Awaitable]) -> None:
