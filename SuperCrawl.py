@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Callable, Awaitable
-from asyncio import wait, gather, create_task, Task
+from asyncio import wait, gather, create_task, Task, Future, FIRST_COMPLETED
 from playwright.async_api import async_playwright, Browser, ElementHandle, Page
 
 def mark_done(lh: LogicHandle) -> Awaitable:
@@ -33,20 +33,18 @@ class Routine:
             await cb(lh)
 
     async def run(self, page: Page) -> None:
-        try:
-            await page.wait_for_selector(self.query)
-            handles = await page.query_selector_all(self.query)
-            await gather(*map(lambda h: self._run_one(LogicHandle(self.sc, h)), handles))
-        except Exception as e:
-            print("reached inner exception")
+        await page.wait_for_selector(self.query)
+        handles = await page.query_selector_all(self.query)
+        await gather(*map(lambda h: self._run_one(LogicHandle(self.sc, h)), handles))
 
 class SuperCrawl:
     browser: Browser | None
     url: str
     page: Page | None
-    _subs: list[SuperCrawl]
     _routines: list[Routine]
+    _subs: list[SuperCrawl]
     _tasks: list[Task]
+    _running: Future[str]
 
     def __init__(self, *arg: str, browser: Browser | None = None):
         self.browser = browser
@@ -54,19 +52,25 @@ class SuperCrawl:
             self.url = arg[0]
         else:
             self.url = None
-        self._subs = []
         self._routines = []
+        self._subs = []
         self._tasks = []
 
     def sub(self, *arg: str) -> SuperCrawl:
         if not self.browser:
             raise ValueError("uninitialized SuperCrawl instance is unable to create a subinstance")
-        return SuperCrawl(arg[0] if len(arg) > 0 else None, browser=self.browser)
+        sub = SuperCrawl(arg[0] if len(arg) > 0 else None, browser=self.browser)
+        self._subs.append(sub)
+        return sub
 
     def every(self, query: str, *cbs: Callable[[LogicHandle], Awaitable]) -> Routine:
         r = Routine(self, f"{query}:not(.supercrawled)", cbs + (mark_done,))
         self._routines.append(r)
         return r
+    
+    def _gc(self) -> None:
+        self._subs = []
+        self._tasks = []
 
     async def _init(self) -> None:
         if not self.browser:
@@ -81,10 +85,12 @@ class SuperCrawl:
             await routine.run(self.page)
 
     async def run(self, *actions: Callable[[Page], Awaitable]) -> None:
+        self._running = Future()
         await self._init()
         for r in self._routines:
             self._tasks.append(create_task(self._apply_routine_loop(r)))
         for action in actions:
             await action(self.page)
-        for task in self._tasks:
-            task.cancel()
+        await gather(*map(lambda s: s._running, self._subs))
+        self._running.set_result(0)
+        self._gc()

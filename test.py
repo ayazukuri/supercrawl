@@ -3,7 +3,11 @@ from asyncio import run, sleep
 
 async def page_waiter(page):
     await sleep(10)
-    print("closing")
+    print("short waiter done")
+
+async def page_waiter2(page):
+    await sleep(15)
+    print("long waiter done")
 
 async def print_lh(lh: LogicHandle):
     h2 = await lh.element_handle.query_selector("h2")
@@ -21,9 +25,9 @@ async def comm_h(lh: LogicHandle):
     if not url or url == "javascript:void(0);": return
     sub = lh.sc.sub(f"https://9gag.com{url}")
     sub.every("section.comment-list", printl)
-    await sub.run()
+    await sub.run(page_waiter2)
 
 sc = SuperCrawl("https://9gag.com")
-sc.every("article", print_lh)
+sc.every("article", comm_h)
 
 run(sc.run(page_waiter))
