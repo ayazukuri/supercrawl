@@ -1,11 +1,12 @@
 from SuperCrawl import SuperCrawl, LogicHandle
+from playwright.async_api import Page
 from asyncio import run, sleep
 
-async def page_waiter(page):
+async def page_waiter(page: Page):
     await sleep(10)
     print("short waiter done")
 
-async def page_waiter2(page):
+async def page_waiter2(page: Page):
     await sleep(15)
     print("long waiter done")
 
