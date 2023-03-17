@@ -96,6 +96,5 @@ class SuperCrawl:
         for action in actions:
             if not self.page: break
             await action(self.page)
-        await gather(*map(lambda s: s.running, self._subs))
-        self.running.set_result(0)
+        await gather(self.running, *map(lambda s: s.running, self._subs))
         self._gc()

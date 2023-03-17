@@ -29,11 +29,11 @@ async def comm_h(lh: LogicHandle):
     if not url or url == "javascript:void(0);": return
     sub = lh.sc.sub(f"https://9gag.com{url}")
     sub.every("div.comment-list-item__text", printl)
-    await sub.run(page_waiter)
+    await sub.run()
 
 sc = SuperCrawl("https://9gag.com")
 sc.every("article", comm_h)
 
 async def exec_context():
-    await gather(sc.run(page_waiter), handler.run())
+    await gather(sc.run(), handler.run())
 run(exec_context())
