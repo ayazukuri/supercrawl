@@ -19,7 +19,6 @@ async def page_waiter(lh: LogicHandle):
 async def printl(lh: LogicHandle):
     t = await lh.element_handle.inner_text()
     d = fac()
-    d.put("_id", int(random() * 10000))
     d.put("text", t)
 
 async def comm_h(lh: LogicHandle):

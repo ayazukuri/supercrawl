@@ -5,6 +5,7 @@ from asyncio import create_task, sleep, wait, Task, Future, FIRST_COMPLETED
 from pymongo.mongo_client import MongoClient
 from pymongo.database import Database
 from pymongo.operations import UpdateOne
+from bson.objectid import ObjectId
 
 T = TypeVar("T")
 
@@ -20,7 +21,7 @@ def group(l: list[T], grp_fn: Callable[[T], str]) -> dict[str, list[T]]:
 
 class Serializable(Abstract, Generic[T]):
     @abstract
-    def id(self) -> Any:
+    def id(self) -> Any | None:
         pass
 
     @abstract
@@ -48,6 +49,8 @@ class Document(Generic[T], Serializable[T]):
         self.entries = {}
 
     def id(self):
+        if "_id" not in self.entries:
+            self.entries["_id"] = ObjectId()
         return self.entries["_id"]
 
     def serialize(self):
@@ -69,17 +72,21 @@ class MongoDriver(Generic[T]):
     _queue: list[Serializable[T]]
     _db: Database[dict[str, T]]
     _sync_task: Task[Any]
+    _sync_delay: int
+    _buffer_max: int
 
-    def __init__(self, client: MongoClient[dict[str, T]], db: str, sync_delay: int = 60):
+    def __init__(self, client: MongoClient[dict[str, T]], db: str, sync_delay: int = 60, max_buffer_size = 200):
         self.client = client
         self._queue = []
         self._db = self.client.get_database(db)
         self._sync_delay = sync_delay
+        self._buffer_max = max_buffer_size
 
     def document_factory(self, collection: str) -> Callable[[], Document[T]]:
         def doc() -> Document[T]:
             d: Document[T] = Document(collection)
             self._queue.append(d)
+            if len(self._queue) >= self._buffer_max: self.sync()
             return d
         return doc
 
