@@ -69,17 +69,18 @@ class SuperCrawl:
         self._routines.append(r)
         return r
     
-    def _gc(self) -> None:
+    def _gc(self) -> Awaitable[Any]:
         self._subs = []
         self._tasks = []
+        return self.page.close()
 
     async def _init(self) -> None:
         if not self.url:
             raise ValueError("instance URL not specified")
         if not self.browser:
             apw = await async_playwright().start()
-            self.browser = await apw.chromium.launch(headless=True)
-        context = await self.browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
+            self.browser = await apw.chromium.launch(headless=False)
+        context = self.browser.contexts[0] if len(self.browser.contexts) != 0 else await self.browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
         self.page = await context.new_page()
         await self.page.goto(self.url)
 
@@ -88,13 +89,13 @@ class SuperCrawl:
             if not self.page: break
             await routine.run(self.page)
 
-    async def run(self, *actions: Callable[[Page], Awaitable[Any]]) -> None:
+    async def run(self, *actions: Callable[[SuperCrawl], Awaitable[Any]]) -> None:
         self.running = Future()
         await self._init()
         for r in self._routines:
             self._tasks.append(create_task(self._apply_routine_loop(r)))
         for action in actions:
             if not self.page: break
-            await action(self.page)
+            self._tasks.append(create_task(action(self)))
         await gather(self.running, *map(lambda s: s.running, self._subs))
-        self._gc()
+        await self._gc()
