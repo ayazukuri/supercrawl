@@ -7,6 +7,7 @@ from json import loads
 
 f = open("config.json")
 cnf = loads(f.read())
+f.close()
 
 mc = MongoClient(cnf["mongodb-connection-string"])
 handler = MongoDriver(mc, "supercrawl", sync_delay=5)
