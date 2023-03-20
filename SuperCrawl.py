@@ -3,9 +3,11 @@ from typing import Callable, Awaitable, Any
 from asyncio import wait, gather, create_task, Task, Future, FIRST_COMPLETED
 from playwright.async_api import async_playwright, Browser, ElementHandle, Page
 
+"""Mark a tag as handled."""
 def mark_done(lh: LogicHandle):
     return lh.element_handle.evaluate("node => node.classList.add('supercrawled')")
 
+"""Helper class for Routine handling of tags."""
 class LogicHandle:
     sc: SuperCrawl
     element_handle: ElementHandle
@@ -14,10 +16,12 @@ class LogicHandle:
         self.sc = sc
         self.element_handle = element_handle
 
+    """Log this tag's bounding box for testing purposes."""
     async def log(self):
         el = self.element_handle
         print(await el.bounding_box())
 
+"""Class defining routines to be executed on types of tags."""
 class Routine:
     sc: SuperCrawl
     query: str
@@ -32,12 +36,14 @@ class Routine:
         for cb in self.cbs:
             await cb(lh)
 
+    """Run this Routine on every instance matching its selector."""
     async def run(self, page: Page) -> None:
         done, _ = await wait([self.sc.running, page.wait_for_selector(self.query)], return_when=FIRST_COMPLETED)
         if 0 in map(lambda task: task.result(), done): return
         handles = await page.query_selector_all(self.query)
         await gather(*map(lambda h: self._run_one(LogicHandle(self.sc, h)), handles))
 
+"""Class handling crawling at a high level."""
 class SuperCrawl:
     browser: Browser | None
     url: str | None
@@ -57,6 +63,7 @@ class SuperCrawl:
         self._subs = []
         self._tasks = []
 
+    """Add a sub-instance to be used in sub-calls."""
     def sub(self, *arg: str) -> SuperCrawl:
         if not self.browser:
             raise ValueError("uninitialized SuperCrawl instance is unable to create a subinstance")
@@ -64,6 +71,7 @@ class SuperCrawl:
         self._subs.append(sub)
         return sub
 
+    """Apply a Routine to a selector."""
     def every(self, query: str, *cbs: Callable[[LogicHandle], Awaitable[Any]]) -> Routine:
         r = Routine(self, f"{query}:not(.supercrawled)", cbs + (mark_done,))
         self._routines.append(r)
@@ -89,6 +97,7 @@ class SuperCrawl:
             if not self.page: break
             await routine.run(self.page)
 
+    """Run this instance until its running Future is resolved."""
     async def run(self, *actions: Callable[[SuperCrawl], Awaitable[Any]]) -> None:
         self.running = Future()
         await self._init()

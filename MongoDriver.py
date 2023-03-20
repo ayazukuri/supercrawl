@@ -9,6 +9,7 @@ from bson.objectid import ObjectId
 
 T = TypeVar("T")
 
+"""Groups items of a list."""
 def group(l: list[T], grp_fn: Callable[[T], str]) -> dict[str, list[T]]:
     d: dict[str, list[T]] = {}
     for item in l:
@@ -19,27 +20,34 @@ def group(l: list[T], grp_fn: Callable[[T], str]) -> dict[str, list[T]]:
             d[al] = [item]
     return d
 
+"""Abstract class for DB data structures."""
 class Serializable(Abstract, Generic[T]):
+    """Return (or generate) unique identifier for resource."""
     @abstract
     def id(self) -> Any | None:
         pass
 
+    """Convert resource to dictionary to be inserted into DB."""
     @abstract
     def serialize(self) -> dict[str, Any]:
         pass
 
+    """Add new key-value pair to resource."""
     @abstract
     def put(self, k: str, v: T) -> Serializable[T]:
         pass
 
+    """Get a value given its key from resource."""
     @abstract
     def get(self, k: str) -> T:
         pass
 
+    """Find which collection this resource is destined to by synced to."""
     @abstract
     def destination(self) -> str:
         pass
 
+"""MongoDB document class."""
 class Document(Generic[T], Serializable[T]):
     _to_coll: str
     entries: dict[str, T]
@@ -82,6 +90,7 @@ class MongoDriver(Generic[T]):
         self._sync_delay = sync_delay
         self._buffer_max = max_buffer_size
 
+    """Factory for documents going to the same collection."""
     def document_factory(self, collection: str) -> Callable[[], Document[T]]:
         def doc() -> Document[T]:
             d: Document[T] = Document(collection)
@@ -96,6 +105,7 @@ class MongoDriver(Generic[T]):
             if 0 in map(lambda task: task.result(), done): return
             self.sync()
 
+    """Sync local driver data with server."""
     def sync(self):
         if len(self._queue) == 0: return
         for dest, grp in group(self._queue, lambda d: d.destination()).items():
@@ -105,6 +115,7 @@ class MongoDriver(Generic[T]):
     def _gc(self):
         self._queue = []
 
+    """Run driver until its running Future is resolved."""
     async def run(self):
         self.running = Future()
         self._sync_task = create_task(self._sync())
